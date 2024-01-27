@@ -435,7 +435,7 @@ class FalconAttention(nn.Module):
         if alibi is None:
             cos, sin = self.rotary_emb(value_layer, seq_len=kv_seq_len)
             query_layer, key_layer = apply_rotary_pos_emb(query_layer, key_layer, cos, sin, position_ids)
-             print('FORWARD ROTARY')
+            print('FORWARD ROTARY')
 
         if layer_past is not None:
             past_key, past_value = layer_past
@@ -478,7 +478,7 @@ class FalconAttention(nn.Module):
                 attention_scores = F.softmax(attention_scores + attention_mask, dim=-1, dtype=hidden_states.dtype)
                 # It is unclear why neither dropout nor head_mask is applied here (while it is with alibi).
                 attn_output = attention_scores @ value_layer
-                 print('NO SCALED DOT PRODUCT, MATMUL IS USED')
+                print('NO SCALED DOT PRODUCT, MATMUL IS USED')
 
             attn_output = attn_output.view(batch_size, self.num_heads, query_length, self.head_dim)
             attn_output = attn_output.permute(0, 2, 1, 3)
@@ -505,7 +505,7 @@ class FalconAttention(nn.Module):
                 attn_output = attn_output.reshape(batch_size, query_length, self.num_heads * self.head_dim)
 
                 attn_output = self.dense(attn_output)
-                 print('ALIBI, SDPA')
+                print('ALIBI, SDPA')
             else:
                 matmul_result = query_layer @ key_layer.transpose(-1, -2)
 
