@@ -414,6 +414,7 @@ class FalconAttention(nn.Module):
             warnings.warn(
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
+        print('START ATTENTION')
 
         fused_qkv = self.query_key_value(hidden_states)  # [batch_size, seq_length, 3 x hidden_size]
         num_kv_heads = self.num_heads if self.new_decoder_architecture else self.num_kv_heads
@@ -426,12 +427,15 @@ class FalconAttention(nn.Module):
         key_layer = key_layer.transpose(1, 2).reshape(batch_size, num_kv_heads, query_length, self.head_dim)
         value_layer = value_layer.transpose(1, 2).reshape(batch_size, num_kv_heads, query_length, self.head_dim)
 
+         print('RESHAPED QKV')
+
         kv_seq_len = key_layer.shape[-2]
         if layer_past is not None:
             kv_seq_len += layer_past[0].shape[-2]
         if alibi is None:
             cos, sin = self.rotary_emb(value_layer, seq_len=kv_seq_len)
             query_layer, key_layer = apply_rotary_pos_emb(query_layer, key_layer, cos, sin, position_ids)
+             print('FORWARD ROTARY')
 
         if layer_past is not None:
             past_key, past_value = layer_past
@@ -466,6 +470,7 @@ class FalconAttention(nn.Module):
                     is_causal=self.is_causal and attention_mask is None and query_length > 1,
                 )
                 attention_scores = None
+                print('NONE ALIBI, SCALED DOT PPRODUCT')
             else:
                 attention_scores = query_layer @ key_layer.transpose(-1, -2)
                 attention_scores /= math.sqrt(self.head_dim)
@@ -473,6 +478,7 @@ class FalconAttention(nn.Module):
                 attention_scores = F.softmax(attention_scores + attention_mask, dim=-1, dtype=hidden_states.dtype)
                 # It is unclear why neither dropout nor head_mask is applied here (while it is with alibi).
                 attn_output = attention_scores @ value_layer
+                 print('NO SCALED DOT PRODUCT, MATMUL IS USED')
 
             attn_output = attn_output.view(batch_size, self.num_heads, query_length, self.head_dim)
             attn_output = attn_output.permute(0, 2, 1, 3)
@@ -499,6 +505,7 @@ class FalconAttention(nn.Module):
                 attn_output = attn_output.reshape(batch_size, query_length, self.num_heads * self.head_dim)
 
                 attn_output = self.dense(attn_output)
+                 print('ALIBI, SDPA')
             else:
                 matmul_result = query_layer @ key_layer.transpose(-1, -2)
 
@@ -530,6 +537,7 @@ class FalconAttention(nn.Module):
                 attn_output = self._merge_heads(attn_output)
 
                 attn_output = self.dense(attn_output)
+                print('ALIBI, NO SPDA)
 
             if output_attentions:
                 return attn_output, present, attention_probs
@@ -776,7 +784,7 @@ class FalconDecoderLayer(nn.Module):
         hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
 
-        self.self_attention = FALCON_ATTENTION_CLASSES[config._attn_implementation](config)
+        self.self_attention = FalconAttention(config)
         self.mlp = FalconMLP(config)
         self.hidden_dropout = config.hidden_dropout
         self.config = config
@@ -787,6 +795,7 @@ class FalconDecoderLayer(nn.Module):
             # The layer norm before the MLP
             self.ln_mlp = LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
         else:
+            print('input layernorm only, no new decoder architecture')
             self.input_layernorm = LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
             if not config.parallel_attn:
                 self.post_attention_layernorm = LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
@@ -814,6 +823,7 @@ class FalconDecoderLayer(nn.Module):
             attention_layernorm_out = self.ln_attn(hidden_states)
             mlp_layernorm_out = self.ln_mlp(hidden_states)
         else:
+            print('You should see this')
             attention_layernorm_out = self.input_layernorm(hidden_states)
 
         # Self attention.
