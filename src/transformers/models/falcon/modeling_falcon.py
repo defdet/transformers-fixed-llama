@@ -427,7 +427,7 @@ class FalconAttention(nn.Module):
         key_layer = key_layer.transpose(1, 2).reshape(batch_size, num_kv_heads, query_length, self.head_dim)
         value_layer = value_layer.transpose(1, 2).reshape(batch_size, num_kv_heads, query_length, self.head_dim)
 
-         print('RESHAPED QKV')
+        print('RESHAPED QKV')
 
         kv_seq_len = key_layer.shape[-2]
         if layer_past is not None:
