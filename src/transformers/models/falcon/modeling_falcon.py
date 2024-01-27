@@ -417,9 +417,11 @@ class FalconAttention(nn.Module):
         print('START ATTENTION')
 
         fused_qkv = self.query_key_value(hidden_states)  # [batch_size, seq_length, 3 x hidden_size]
+        print(fused_qkv.shape, 'FUSED QKV')
         num_kv_heads = self.num_heads if self.new_decoder_architecture else self.num_kv_heads
         # 3 x [batch_size, seq_length, num_heads, head_dim]
         (query_layer, key_layer, value_layer) = self._split_heads(fused_qkv)
+        print(query_layer.shape, key_layer.shape, value_layer.shape, 'QKV BEFORE RESHAPE')
 
         batch_size, query_length, _, _ = query_layer.shape
 
@@ -428,6 +430,7 @@ class FalconAttention(nn.Module):
         value_layer = value_layer.transpose(1, 2).reshape(batch_size, num_kv_heads, query_length, self.head_dim)
 
         print('RESHAPED QKV')
+        print(query_layer.shape, key_layer.shape, value_layer.shape, 'QKV AFTER RESHAPE')
 
         kv_seq_len = key_layer.shape[-2]
         if layer_past is not None:
@@ -471,6 +474,7 @@ class FalconAttention(nn.Module):
                 )
                 attention_scores = None
                 print('NONE ALIBI, SCALED DOT PPRODUCT')
+                print(attn_output.shape, 'ATTN_OUTPUT')
             else:
                 attention_scores = query_layer @ key_layer.transpose(-1, -2)
                 attention_scores /= math.sqrt(self.head_dim)
@@ -485,6 +489,7 @@ class FalconAttention(nn.Module):
             attn_output = attn_output.reshape(batch_size, query_length, self.num_heads * self.head_dim)
 
             attn_output = self.dense(attn_output)
+            print(attn_output.shape, 'ATTN_OUTPUT FINAL')
 
             if output_attentions:
                 return attn_output, present, attention_scores
@@ -767,7 +772,9 @@ class FalconMLP(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.act(self.dense_h_to_4h(x))
+        print(x.shape, 'MLP INTERM')
         x = self.dense_4h_to_h(x)
+        print(x.shape, 'MLP FINAL')
         return x
 
 
