@@ -537,7 +537,7 @@ class FalconAttention(nn.Module):
                 attn_output = self._merge_heads(attn_output)
 
                 attn_output = self.dense(attn_output)
-                print('ALIBI, NO SPDA)
+                print('ALIBI, NO SPDA')
 
             if output_attentions:
                 return attn_output, present, attention_probs
